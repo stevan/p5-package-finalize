@@ -16,7 +16,7 @@ use Hash::Util     qw[
     hash_locked 
 ];
 
-use constant DEBUG => 1;
+use constant DEBUG => $ENV{'DEBUG_PACKAGE_FINALIZE'};
 
 our %STUBBED_KEYS;
 our %FINALIZERS;

@@ -3,23 +3,22 @@
 use strict;
 use warnings;
 
+use Test::More;
+use Test::Fatal;
+
 use lib 't/lib';
 
-BEGIN { warn "main->BEGIN" }
-END   { warn "main->END"   }
+use_ok('Foo');
+use_ok('Bar');
+use_ok('Baz');
 
-use Foo;
-use Bar;
-use Baz;
+is(Foo->bar,   'Foo::bar',   '... got the expected results');
+is(Foo->baz,   'Bar::baz',   '... got the expected results');
+is(Foo->gorch, 'Bar::gorch', '... got the expected results');
+is(Foo->bling, 'Baz::bling', '... got the expected results');
 
-warn Foo->bar;
-warn Foo->baz;
-warn Foo->gorch;
-warn Foo->bling;
+like(exception { Foo->woot }, qr/^Attempt to access disallowed key \'woot\' in a restricted hash/, '... got the exception we expected');
+like(exception { no strict 'refs'; ${'Foo::'}{BAR} }, qr/^Attempt to access disallowed key \'BAR\' in a restricted hash/, '... got the exception we expected');
+like(exception { eval "sub Foo::beep {}"; die $@ if $@; }, qr/^Attempt to access disallowed key \'beep\' in a restricted hash/, '... got the exception we expected');
 
-UNITCHECK {
-    warn "main->UNICHECK enter ...";
-    warn "... leave main->UNICHECK";
-}
-
-1;
+done_testing;
