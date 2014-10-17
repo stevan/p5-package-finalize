@@ -20,5 +20,6 @@ is(Foo->bling, 'Baz::bling', '... got the expected results');
 like(exception { Foo->woot }, qr/^Attempt to access disallowed key \'woot\' in a restricted hash/, '... got the exception we expected');
 like(exception { no strict 'refs'; ${'Foo::'}{BAR} }, qr/^Attempt to access disallowed key \'BAR\' in a restricted hash/, '... got the exception we expected');
 like(exception { eval "sub Foo::beep {}"; die $@ if $@; }, qr/^Attempt to access disallowed key \'beep\' in a restricted hash/, '... got the exception we expected');
+like(exception { no strict 'refs'; delete ${'Foo::'}{BAZ} }, qr/^Attempt to delete disallowed key \'BAZ\' from a restricted hash/, '... got the exception we expected');
 
 done_testing;
