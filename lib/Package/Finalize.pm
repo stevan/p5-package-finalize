@@ -114,7 +114,7 @@ sub import {
             $SEMAFORE{ $pkg } = 0;
         },
     );
-
+ 
     # set up the UNITCHECK hook
     Devel::Hook->push_UNITCHECK_hook(sub {
         _log("{\n") if DEBUG;
