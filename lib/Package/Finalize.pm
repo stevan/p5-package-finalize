@@ -120,7 +120,7 @@ sub import {
                             }
                         }
                         lock_keys_plus( %{ $class.'::' }, @{ $STUBBED_KEYS{ $class } } );
-                        delete_stubbed_keys( $class, \@keys_to_delete, \%std_keys_to_add );
+                        _delete_stubbed_keys( $class, \@keys_to_delete, \%std_keys_to_add );
                         push @{ $STUBBED_KEYS{ $class } } => @keys_to_delete;
                         lock_value(  %{ $class.'::' }, $_ ) for keys %{ $class.'::' };
                     }
@@ -130,7 +130,7 @@ sub import {
             _log("... actually locking keys of the $pkg stash (which now has all the possible keys we might access)") if DEBUG;
             lock_keys( %{ $pkg.'::' } );
             _log("... the following keys for $pkg have been locked [ " . (join ", " => sort(legal_keys( %{ $pkg.'::' } ))) . " ]") if DEBUG;
-            delete_stubbed_keys( $pkg, \@std_keys_to_delete, \%std_keys_to_add );
+            _delete_stubbed_keys( $pkg, \@std_keys_to_delete, \%std_keys_to_add );
             push @{ $STUBBED_KEYS{$pkg} } => @std_keys_to_delete;
             lock_value(  %{ $pkg.'::' }, $_ ) for keys %{ $pkg.'::' };
         }
@@ -139,6 +139,7 @@ sub import {
         _log("}\n") if DEBUG;
     });
 
+    # now install the FINALIZE sub and lift it 
     {
         no strict 'refs';
         *{$pkg.'::FINALIZE'} = sub (&) { push @{ $FINALIZERS{ $pkg } } => $_[0]; return };
@@ -146,7 +147,14 @@ sub import {
     Devel::BeginLift->setup_for( $pkg => [ 'FINALIZE' ] );
 }
 
-sub delete_stubbed_keys {
+sub add_finalizer_for {
+    my (undef, $pkg, $callback) = @_;
+    push @{ $FINALIZERS{ $pkg } } => $callback;
+}
+
+# utils ...
+
+sub _delete_stubbed_keys {
     my ($pkg, $keys_to_delete, $key_types) = @_;
     _log("... removing all the keys we stubbed in $pkg [ " . (join ", " => sort(@$keys_to_delete)) . " ]") if DEBUG;    
     no strict 'refs';
