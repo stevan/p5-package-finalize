@@ -16,7 +16,7 @@ use Hash::Util     qw[
     hash_locked 
 ];
 
-use constant DEBUG => $ENV{'DEBUG_PACKAGE_FINALIZE'};
+use constant DEBUG => 1; #$ENV{'DEBUG_PACKAGE_FINALIZE'};
 
 our %STUBBED_KEYS;
 our %FINALIZERS;
@@ -25,6 +25,8 @@ our $INDENT = 0;
 
 sub import {
     shift;
+
+    #return unless @_;
 
     my $pkg = caller;
 
