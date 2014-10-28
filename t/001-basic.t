@@ -31,8 +31,28 @@ is(My::Test->test1, 'My::Test::test1', '... got the expected results');
 is(My::Test->test2, 'My::Test::test2', '... got the expected results');
 is(My::Test->test3, 'My::Test::test3', '... got the expected results');
 
-like(exception { My::Test->woot }, qr/^Attempt to access disallowed key \'woot\' in a restricted hash/, '... got the exception we expected');
-like(exception { no strict 'refs'; ${'My::Test::'}{BAR} }, qr/^Attempt to access disallowed key \'BAR\' in a restricted hash/, '... got the exception we expected');
-like(exception { eval "sub My::Test::beep {}"; die $@ if $@; }, qr/^Attempt to access disallowed key \'beep\' in a restricted hash/, '... got the exception we expected');
+like(
+    exception { My::Test->woot }, 
+    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(woot\) is not allowed/, 
+    '... got the exception we expected'
+);
+
+is(
+    exception { no strict 'refs'; ${'My::Test::'}{BAR} }, 
+    undef, 
+    '... got the exception we expected'
+);
+
+like(
+    exception { no strict 'refs'; ${'My::Test::'}{BAR} = 10 }, 
+    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(BAR\) is not allowed/, 
+    '... got the exception we expected'
+);
+
+like(
+    exception { eval "sub My::Test::beep {}"; die $@ if $@; }, 
+    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(beep\) is not allowed/, 
+    '... got the exception we expected'
+);
 
 done_testing;
