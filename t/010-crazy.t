@@ -14,6 +14,8 @@ use lib 't/lib';
     use warnings;
     use GenAccessors;
 
+    # warn "HELLO!" if __PACKAGE__->can('one');
+
     has 'one';
     has 'two';
 }
