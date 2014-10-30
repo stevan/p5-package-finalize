@@ -8,9 +8,9 @@ use Devel::Hook;
 use Devel::BeginLift;
 use Variable::Magic qw[ wizard cast ];
 
-use constant DEBUG => 0; #$ENV{'DEBUG_PACKAGE_FINALIZE'};
+use constant DEBUG => $ENV{'DEBUG_PACKAGE_FINALIZE'};
 
-use constant DEFAULT_IGNORED_KEYS => [qw(
+use constant DEFAULT_IGNORED_KEYS => [qw/
     import   
     unimport 
 
@@ -21,6 +21,10 @@ use constant DEFAULT_IGNORED_KEYS => [qw(
     AUTHORITY
 
     ISA
+    DESTROY
+
+    ()
+    ((
 
     BEGIN    
     INIT 
@@ -30,88 +34,109 @@ use constant DEFAULT_IGNORED_KEYS => [qw(
     __ANON__ 
 
     AUTOLOAD
-)];
+/];
 
 our %WIZARDS;
-our %IGNORE;
 our %FINALIZERS;
-our %SEMAFORE;
+our %FETCH_SEMAFORE;
+our %STORE_SEMAFORE;
 
 our $INDENT = 0;
 
-sub import {
-    shift;
+sub import { (shift)->import_into( caller ) }
 
-    my $pkg = caller;
+sub import_into {
+    my (undef, $pkg) = @_;
 
-    $FINALIZERS{ $pkg } = [] unless exists $FINALIZERS{ $pkg };
-    $SEMAFORE{ $pkg }   = 0;
-    $IGNORE{ $pkg }     = {  map { $_ => undef } @{ DEFAULT_IGNORED_KEYS() } };
-    $WIZARDS{ $pkg }    = wizard(
+    $FINALIZERS{ $pkg }     = [] unless exists $FINALIZERS{ $pkg };
+    $FETCH_SEMAFORE{ $pkg } = 0;
+    $STORE_SEMAFORE{ $pkg } = 0;
+    $WIZARDS{ $pkg }        = wizard(
         data     => sub { $_[1] },
         fetch    => sub {
-            return if $SEMAFORE{ $pkg };
-            $SEMAFORE{ $pkg } = 1;            
+            # Sometimes we get in an infinite loop
+            # because the `store` handler is checking
+            # the packages in the MRO and so doing a 
+            # bunch of `fetch` operations that we 
+            # just really need to ignore, so we do
+            return if $FETCH_SEMAFORE{ $pkg };  
+
             my ($stash, $to_ignore, $key) = @_;
-            _log("... attempting to fetch $key in $pkg") if DEBUG;
-            return if exists $to_ignore->{ $key };
-            return if exists $stash->{ $key };
-            {
+            
+            _log("... attempting to fetch <$key> from <$pkg>") if DEBUG;
+            
+            return if exists $to_ignore->{ $key }; # ignore standard perl stuff and our initial entries ...
+            
+            # now check the MRO, because the way 
+            # method caching works, it will test
+            # for method existence at each class
+            # in the MRO until it finds it ...
+            _log("!!! key <$key> does not exist in <$pkg>, checking MRO to see if this is just method lookup") if DEBUG;
+            {                                      
                 no strict 'refs';
                 my @mro = @{ mro::get_linear_isa( $pkg ) };
                 shift @mro;
                 for my $class ( @mro ) {
-                    _log("... looking for $key in $class (on behalf of $pkg)") if DEBUG;
+                    _log("... looking for <$key> in <$class> (on behalf of <$pkg>)") if DEBUG;
                     if ( exists ${ $class . '::'}{ $key } ) {
-                        _log("GOT THE KEY!!!! $key in $class for $pkg") if DEBUG;
+                        _log(">>> found <$key> in <$class> for <$pkg>") if DEBUG;
                         return;
                     }
                 }
             }
+
             die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to access key ($key) is not allowed";
-            $SEMAFORE{ $pkg } = 0;
         },
         delete   => sub {
-            $SEMAFORE{ $pkg } = 1;
             my ($stash, $to_ignore, $key) = @_;
-            _log("... attempting to delete $key in $pkg") if DEBUG;
-            return if exists $to_ignore->{ $key };
-            return if exists $stash->{ $key };
-            {
-                no strict 'refs';
-                my @mro = @{ mro::get_linear_isa( $pkg ) };
-                shift @mro;
-                for my $class ( @mro ) {
-                    _log("... looking for $key in $class (on behalf of $pkg)") if DEBUG;
-                    if ( exists ${ $class . '::'}{ $key } ) {
-                        _log("GOT THE KEY!!!! $key in $class for $pkg") if DEBUG;
-                        return;
-                    }
-                }
-            }
+            _log("... attempting to delete <$key> from <$pkg>") if DEBUG;
+            return if exists $to_ignore->{ $key }; # ignore standard perl stuff ...
             die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to delete key ($key) is not allowed";
-            $SEMAFORE{ $pkg } = 0;
         },        
         store    => sub { 
-            $SEMAFORE{ $pkg } = 1;
+            # In some cases we need to ignore
+            # the `store` operation, the particular
+            # case we have found is within a call 
+            # to `can` that will fail, perl will 
+            # attempt to store the key because of 
+            # how method caching works, so we just 
+            # ignore this here.
+            return if $STORE_SEMAFORE{ $pkg };
+
+            # wrap this code with the semafore 
+            # for the `fetch` operation ...
+            $FETCH_SEMAFORE{ $pkg } = 1;
+
             my ($stash, $to_ignore, $key) = @_;
-            _log("... attempting to store into $key in $pkg") if DEBUG;
-            return if exists $to_ignore->{ $key };
-            return if exists $stash->{ $key };
+            
+            _log("... attempting to store <$key> into <$pkg>") if DEBUG;
+            
+            return if exists $to_ignore->{ $key }; # ignore standard perl stuff ...
+            
+            return if $key =~ /::$/;               # allow the creation of sub-packages ...
+
+            # now check the MRO, because the way 
+            # method caching works, it will store
+            # a local copy of a method in the 
+            # package to help speed up dispatch
+            _log("!!! key <$key> does not exist in <$pkg>, checking MRO to see if this is just method caching") if DEBUG;
             {
                 no strict 'refs';
                 my @mro = @{ mro::get_linear_isa( $pkg ) };
                 shift @mro;
                 for my $class ( @mro ) {
-                    _log("... looking for $key in $class (on behalf of $pkg)") if DEBUG;
+                    _log("... looking for <$key> in <$class> (on behalf of <$pkg>)") if DEBUG;
                     if ( exists ${ $class . '::'}{ $key } ) {
-                        _log("GOT THE KEY!!!! $key in $class for $pkg") if DEBUG;
+                        _log(">>> found <$key> in <$class> for <$pkg>") if DEBUG;
                         return;
                     }
                 }
-            }            
-            die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to store into key ($key) is not allowed";
-            $SEMAFORE{ $pkg } = 0;
+            }    
+
+            # turn this off ...        
+            $FETCH_SEMAFORE{ $pkg } = 0;             
+
+            die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to store into key ($key) is not allowed";           
         },
     );
 
@@ -119,15 +144,30 @@ sub import {
     Devel::Hook->push_UNITCHECK_hook(sub {
         _log("{\n") if DEBUG;
         $INDENT++;            
-        _log("running finalizers for $pkg ...") if DEBUG;
+        _log("running finalizers for package <$pkg> ...") if DEBUG;
         $_->() for @{ $FINALIZERS{ $pkg } };
-        _log("... finalizers for $pkg have been run, preparing the stash for locking") if DEBUG;
+        _log("... finalizers for package <$pkg> have been run, now preparing the stash for locking") if DEBUG;
         {
             no strict   'refs';
             no warnings 'once';
-            cast %{ $pkg.'::' }, $WIZARDS{ $pkg }, $IGNORE{ $pkg };
+            _log("!!! adding a custom &can to <$pkg> to deal with method caching behaviors in `store` operation") if DEBUG;
+            *{ $pkg.'::can' } = sub {  
+                $STORE_SEMAFORE{ $pkg } = 1;
+                my $x = UNIVERSAL::can( @_ );
+                $STORE_SEMAFORE{ $pkg } = 0;
+                return $x;  
+            };
+            _log("... marking the following value(s) [" . (join ', ' => keys %{ $pkg.'::' }) . "] as SvREADONLY") if DEBUG;
+            Internals::SvREADONLY( ${ $pkg.'::' }{ $_ }, 1 ) for keys %{ $pkg.'::' };
+            _log("... applying stash locking magic to package <$pkg>") if DEBUG;
+            cast(
+                %{ $pkg.'::' }, 
+                $WIZARDS{ $pkg }, 
+                { map { $_ => undef } ( keys %{ $pkg.'::' }, @{ DEFAULT_IGNORED_KEYS() } ) } 
+            );
+            _log("... package <$pkg> finalized with the following keys [" . (join ', ' => keys %{ $pkg.'::' }) . "]") if DEBUG;
         }
-        _log("... finalization complete for $pkg") if DEBUG;
+        _log("... finalization complete for package <$pkg>") if DEBUG;
         $INDENT--;
         _log("}\n") if DEBUG;
     });

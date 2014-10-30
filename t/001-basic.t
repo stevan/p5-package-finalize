@@ -33,26 +33,26 @@ is(My::Test->test3, 'My::Test::test3', '... got the expected results');
 
 like(
     exception { My::Test->woot }, 
-    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(woot\) is not allowed/, 
-    '... got the exception we expected'
+    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to access key \(woot\) is not allowed/, 
+    '... got the exception we expected (for calling a method that does not exist)'
 );
 
-is(
+like(
     exception { no strict 'refs'; ${'My::Test::'}{BAR} }, 
-    undef, 
-    '... got the exception we expected'
+    qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to access key \(BAR\) is not allowed/, 
+    '... got the exception we expected (for accessing the package via stash key)'
 );
 
 like(
     exception { no strict 'refs'; ${'My::Test::'}{BAR} = 10 }, 
     qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(BAR\) is not allowed/, 
-    '... got the exception we expected'
+    '... got the exception we expected (for attempting to store into package via stash key)'
 );
 
 like(
     exception { eval "sub My::Test::beep {}"; die $@ if $@; }, 
     qr/^\[PACKAGE FINALIZED\] The package \(My\:\:Test\) has been finalized, attempt to store into key \(beep\) is not allowed/, 
-    '... got the exception we expected'
+    '... got the exception we expected (for attempting to install a new method)'
 );
 
 done_testing;

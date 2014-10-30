@@ -8,14 +8,35 @@ use Test::Fatal;
 
 use lib 't/lib';
 
-use_ok('Foo');
-use_ok('Bar');
-use_ok('Baz');
+BEGIN {
+    use_ok('Foo');
+    use_ok('Bar');
+    use_ok('Baz');
+}
+
+can_ok('Foo', 'bar');
+can_ok('Foo', 'baz');
+can_ok('Foo', 'gorch');
+can_ok('Foo', 'bling');
 
 is(Foo->bar,   'Foo::bar',   '... got the expected results');
 is(Foo->baz,   'Bar::baz',   '... got the expected results');
 is(Foo->gorch, 'Bar::gorch', '... got the expected results');
 is(Foo->bling, 'Baz::bling', '... got the expected results');
+
+like(
+    exception { no strict 'refs'; *{'Foo::bar'} = sub { 'Foo::bar::2' } }, 
+    qr/^Modification of a read-only value attempted/, 
+    '... got the expected exception (for attempting to replace a method)'
+);
+
+is(Foo->bar, 'Foo::bar', '... got the expected results (still)');
+
+is(
+    exception { eval "package Foo::Gorch; sub ahhh { 'Foo::Gorch::ahhh' }"; die $@ if $@ },
+    undef, 
+    '... got no exception (sub-packages are allowed)'
+);
 
 like(
     exception { Foo->woot }, 
@@ -35,14 +56,14 @@ like(
     '... got the expected exception (for attempting to store into a stash key using hash access)'
 );
 
-is(
+like(
     exception { no strict 'refs'; ${'Foo::'}{BAR} }, 
-    undef, 
+    qr/^\[PACKAGE FINALIZED\] The package \(Foo\) has been finalized, attempt to access key \(BAR\) is not allowed/, 
     '... got the expected exception (for attempting to store into a stash key using hash access)'
 );
 
 like(
-    exception { eval "sub Foo::beep {}"; die $@ if $@; }, 
+    exception { eval "sub Foo::beep {}"; die $@ if $@ }, 
     qr/^\[PACKAGE FINALIZED\] The package \(Foo\) has been finalized, attempt to store into key \(beep\) is not allowed/, 
     '... got the expected exception (for adding a fully qualified method)'
 );

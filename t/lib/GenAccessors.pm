@@ -25,8 +25,8 @@ sub import {
     };
 
     Devel::BeginLift->setup_for( $pkg => [ 'has' ] );
-
-    goto \&Package::Finalize::import;
+    Package::Finalize->import_into( $pkg );
+    Package::Finalize->add_finalizer_for( $pkg, sub { delete ${ $pkg . '::'}{'has'} });
 }
 
 1;
