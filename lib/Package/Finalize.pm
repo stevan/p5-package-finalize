@@ -43,10 +43,13 @@ our %STORE_SEMAFORE;
 
 our $INDENT = 0;
 
-sub import { (shift)->import_into( caller ) }
+sub import { 
+    my $pkg = shift;
+    $pkg->import_into( caller, @_ );
+}
 
 sub import_into {
-    my (undef, $pkg) = @_;
+    my (undef, $pkg, @additional_keys_to_ignore) = @_;
 
     $FINALIZERS{ $pkg }     = [] unless exists $FINALIZERS{ $pkg };
     $FETCH_SEMAFORE{ $pkg } = 0;
@@ -163,7 +166,13 @@ sub import_into {
             cast(
                 %{ $pkg.'::' }, 
                 $WIZARDS{ $pkg }, 
-                { map { $_ => undef } ( keys %{ $pkg.'::' }, @{ DEFAULT_IGNORED_KEYS() } ) } 
+                { 
+                    map { $_ => undef } ( 
+                        keys %{ $pkg.'::' }, 
+                        @additional_keys_to_ignore,                        
+                        @{ DEFAULT_IGNORED_KEYS() },
+                    ) 
+                } 
             );
             _log("... package <$pkg> finalized with the following keys [" . (join ', ' => keys %{ $pkg.'::' }) . "]") if DEBUG;
         }
