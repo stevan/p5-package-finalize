@@ -88,13 +88,13 @@ sub import_into {
                 }
             }
 
-            die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to access key ($key) is not allowed";
+            _croak("[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to access key ($key) is not allowed");
         },
         delete   => sub {
             my ($stash, $to_ignore, $key) = @_;
             _log("... attempting to delete <$key> from <$pkg>") if DEBUG;
             return if exists $to_ignore->{ $key }; # ignore standard perl stuff ...
-            die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to delete key ($key) is not allowed";
+            _croak("[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to delete key ($key) is not allowed");
         },        
         store    => sub { 
             # In some cases we need to ignore
@@ -139,7 +139,7 @@ sub import_into {
             # turn this off ...        
             $FETCH_SEMAFORE{ $pkg } = 0;             
 
-            die "[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to store into key ($key) is not allowed";           
+            _croak("[PACKAGE FINALIZED] The package ($pkg) has been finalized, attempt to store into key ($key) is not allowed");           
         },
     );
  
@@ -191,7 +191,7 @@ sub import_into {
 
 sub add_finalizer_for {
     my (undef, $pkg, $callback) = @_;
-    die "No finalizers available for $pkg, perhaps you forgot to `use Package::Finalize` for $pkg" 
+    _croak("No finalizers available for $pkg, perhaps you forgot to `use Package::Finalize` for $pkg") 
         unless exists $FINALIZERS{ $pkg };
     push @{ $FINALIZERS{ $pkg } } => $callback;
     return;
@@ -200,6 +200,11 @@ sub add_finalizer_for {
 sub _log {
     my ($msg) = @_;
     warn(( ' ' x ($INDENT * 2) ), $msg);
+}
+
+sub _croak {
+    my (undef, $file, $line) = caller(1);
+    die @_, "at $file line $line", "\n";
 }
 
 1;
