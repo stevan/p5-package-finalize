@@ -204,7 +204,7 @@ sub _log {
 
 sub _croak {
     my (undef, $file, $line) = caller(1);
-    die @_, "at $file line $line", "\n";
+    die @_, " at $file line $line\n";
 }
 
 1;
