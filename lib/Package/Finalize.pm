@@ -21,6 +21,7 @@ use constant DEFAULT_IGNORED_KEYS => [qw/
     AUTHORITY
 
     ISA
+    DOES
     DESTROY
 
     ()
