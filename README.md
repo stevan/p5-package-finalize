@@ -17,19 +17,9 @@ up the class.
 
 A closed class is basically a class whose stash (symbol hash) has 
 been locked, which means no entries can be added or removed from it.
-In preparation for this, we build up a list of allowed keys which 
-are not already in the stash, these include: 
-
-- the set of standard package variables and methods that Perl 
-  assumes exist (`import`, `unimport`, etc.)
-- the set of inherited methods in the class's `mro`
-- if multiple inheritance is detected, we stub out methods of the 
-  class siblings that might be looked up through their stash
-
-Once these have been stubbed in, we lock the set of keys, then go 
-about removing the stubbed entries. In the process we also confirm 
-that all inherited classes are also locked, and throw an error if 
-they are not.
+We make some allowances for special cases introduced by Perl's method
+caching mechanism, but do our best to prevent all outside manual 
+modifications.
 
 # What is it good for?
 
