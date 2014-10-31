@@ -26,6 +26,7 @@ use constant DEFAULT_IGNORED_KEYS => [qw/
 
     ()
     ((
+    (""
 
     BEGIN    
     INIT 
